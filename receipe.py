@@ -22,60 +22,97 @@ class Recipe:
     flavor_profile: str
     garnish_tips: str
     pairing_suggestions: str
+# ... existing code ...
 
-def get_recipe_from_ai(main_ingredient, dietary_restrictions, cooking_time, difficulty):
-    system_content = """You are a world-class AI chef. Generate a creative recipe based on the given ingredients and preferences. 
-    Provide the recipe in JSON format with the following structure:
+def get_recipe_from_ai(cuisine_type, available_ingredients, cooking_time, difficulty):
+    system_content = """You are an expert Indian chef. Generate a creative Indian recipe based on the available ingredients and preferences. 
+    Response must be in valid JSON format with the following structure:
     {
         "title": "Recipe name",
         "cooking_time": "Time in minutes",
         "difficulty": "Difficulty level",
-        "ingredients": ["ingredient1", "ingredient2", ...],
+        "ingredients": ["ingredient1 with quantity", "ingredient2 with quantity", ...],
         "instructions": ["step1", "step2", ...],
         "nutrition": {"calories": "xxx kcal", "protein": "xxg", "carbs": "xxg", "fat": "xxg"},
-        "flavor_profile": "Description",
-        "garnish_tips": "Tips",
-        "pairing_suggestions": "Suggestions"
+        "flavor_profile": "Description of taste and spice level",
+        "garnish_tips": "Tips for garnishing",
+        "pairing_suggestions": "Suggestions for accompaniments like rice, roti, etc."
     }"""
 
-    query = f"""Create a recipe using {main_ingredient} as the main ingredient.
-    Dietary restrictions: {', '.join(dietary_restrictions) if dietary_restrictions else 'None'}
+    query = f"""Create an Indian {cuisine_type} recipe using these available ingredients: {', '.join(available_ingredients)}.
     Maximum cooking time: {cooking_time} minutes
-    Cooking skill level: {difficulty}"""
+    Cooking skill level: {difficulty}
+    Only use the ingredients mentioned or very basic Indian kitchen ingredients."""
 
     try:
         chat_response = client.chat.completions.create(
-            model="meta-llama/llama-3.3-70b-instruct",
+            model="meta-llama/llama-3.1-8b-instruct",
             messages=[
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": query},
             ],
             stream=False,
-            max_tokens=1000,  # Increased for full recipe
-            temperature=0.7,   # Increased for creativity
-            top_p=0.9         # Increased for variety
+            max_tokens=1500,
+            temperature=0.7,
+            top_p=0.9
         )
 
-        recipe_json = json.loads(chat_response.choices[0].message.content)
-        return Recipe(**recipe_json)
+        # Clean and validate the response
+        response_text = chat_response.choices[0].message.content.strip()
+        # Find the JSON part of the response (in case the model adds any extra text)
+        start_idx = response_text.find('{')
+        end_idx = response_text.rfind('}') + 1
+        if start_idx != -1 and end_idx != -1:
+            recipe_json = json.loads(response_text[start_idx:end_idx])
+            return Recipe(**recipe_json)
+        else:
+            raise ValueError("No valid JSON found in response")
+            
     except Exception as e:
         st.error(f"Error generating recipe: {str(e)}")
         return None
 
 def create_recipe_app():
-    st.title("🍳 AI Chef's Recipe Generator")
+    st.title("👩‍🍳 Indian Recipe Generator")
     
     # Sidebar for user inputs
     st.sidebar.header("Customize Your Recipe")
     
-    main_ingredient = st.sidebar.selectbox(
-        "Main Ingredient",
-        ["Chicken", "Fish", "Beef", "Vegetarian", "Pork"]
+    # Veg/Non-veg selection
+    cuisine_type = st.sidebar.radio(
+        "Select Cuisine Type",
+        ["Vegetarian", "Non-Vegetarian"]
     )
     
-    dietary_restrictions = st.sidebar.multiselect(
-        "Dietary Restrictions",
-        ["Gluten-free", "Dairy-free", "Vegan", "Nut-free", "Low-carb"]
+    # Common Indian ingredients based on cuisine type
+    common_veg_ingredients = [
+        "Potatoes", "Tomatoes", "Onions", "Green Peas", "Cauliflower", 
+        "Paneer", "Spinach", "Bell Peppers", "Carrots", "Beans",
+        "Mushrooms", "Cabbage", "Eggplant", "Okra", "Lentils (Dal)"
+    ]
+    
+    common_nonveg_ingredients = [
+        "Chicken", "Mutton", "Fish", "Eggs", "Prawns"
+    ] if cuisine_type == "Non-Vegetarian" else []
+    
+    # Common Indian spices
+    common_spices = [
+        "Turmeric", "Red Chili Powder", "Garam Masala", "Cumin Seeds",
+        "Coriander Powder", "Ginger", "Garlic", "Green Chilies"
+    ]
+    
+    # Combine ingredients based on selection
+    available_ingredients = st.sidebar.multiselect(
+        "Select Available Ingredients",
+        common_veg_ingredients + common_nonveg_ingredients,
+        help="Select the main ingredients you have"
+    )
+    
+    available_spices = st.sidebar.multiselect(
+        "Select Available Spices",
+        common_spices,
+        default=["Turmeric", "Red Chili Powder", "Garam Masala"],
+        help="Select the spices you have"
     )
     
     cooking_time_pref = st.sidebar.slider(
@@ -89,15 +126,23 @@ def create_recipe_app():
     )
 
     if st.sidebar.button("Generate Recipe"):
-        with st.spinner("👩‍🍳 Creating your personalized recipe..."):
+        if not available_ingredients:
+            st.warning("Please select at least one main ingredient!")
+            return
+            
+        with st.spinner("👩‍🍳 Creating your personalized Indian recipe..."):
+            # Combine all ingredients for the recipe generation
+            all_ingredients = available_ingredients + available_spices
             recipe = get_recipe_from_ai(
-                main_ingredient,
-                dietary_restrictions,
+                cuisine_type,
+                all_ingredients,
                 cooking_time_pref,
                 difficulty_pref
             )
             if recipe:
                 display_recipe(recipe)
+
+# ... rest of the existing display_recipe function and main block remains the same ...
 
 def display_recipe(recipe: Recipe):
     # Display recipe title with emoji
