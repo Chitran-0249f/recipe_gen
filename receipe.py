@@ -190,8 +190,7 @@ def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficul
         col1, col2 = st.columns(2)
         with col1:
             send = st.button("Send", key="send")
-        with col2:
-            clear = st.button("Clear", key="clear")
+        
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -213,10 +212,7 @@ def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficul
         # Clear input
         st.session_state.user_input = ''
 
-    # Handle clear button
-    if clear:
-        st.session_state.messages = []
-        st.session_state.user_input = ''
+    
 
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
