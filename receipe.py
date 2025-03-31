@@ -101,89 +101,93 @@ def get_cooking_assistance(query, recipe: Recipe, cuisine_type, cooking_time, di
         return f"Sorry, I couldn't process your question: {str(e)}"
 
 def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficulty):
-    # Store recipe in session state to persist it
+    # Store recipe in session state if not already there
     if 'current_recipe' not in st.session_state:
         st.session_state.current_recipe = recipe
+        st.session_state.cuisine_type = cuisine_type
+        st.session_state.cooking_time = cooking_time
+        st.session_state.difficulty = difficulty
     
-    # Create two main sections using columns
-    recipe_col, chat_col = st.columns([2, 1], gap="large")
+    # Initialize chat history if not exists
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
     
-    # Left column: Fixed recipe display
-    with recipe_col:
-        # Recipe title
-        st.header(f"🍽️ {st.session_state.current_recipe.title}")
+    # Initialize messages container in session state
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+
+    # Main container for the entire content
+    main_container = st.container()
+    
+    with main_container:
+        # Create two main sections using columns
+        recipe_col, chat_col = st.columns([2, 1], gap="large")
         
-        # Quick info
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write(f"⏱️ Cooking Time: {st.session_state.current_recipe.cooking_time}")
-        with col2:
-            st.write(f"📊 Difficulty: {st.session_state.current_recipe.difficulty}")
-        
-        # Create tabs for recipe details
-        recipe_tab, details_tab = st.tabs(["📝 Recipe", "✨ Additional Details"])
-        
-        with recipe_tab:
-            # Ingredients section
-            st.subheader("Ingredients")
+        # Left column: Fixed recipe display
+        with recipe_col:
+            st.header(f"🍽️ {st.session_state.current_recipe.title}")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"⏱️ Cooking Time: {st.session_state.current_recipe.cooking_time}")
+            with col2:
+                st.write(f"📊 Difficulty: {st.session_state.current_recipe.difficulty}")
+            
+            # Fixed sections for ingredients and instructions
+            st.subheader("📝 Ingredients")
             for ingredient in st.session_state.current_recipe.ingredients:
                 st.write(f"• {ingredient}")
             
-            # Instructions section
-            st.subheader("Instructions")
+            st.subheader("👩‍🍳 Instructions")
             for i, instruction in enumerate(st.session_state.current_recipe.instructions, 1):
                 st.write(f"{i}. {instruction}")
-        
-        with details_tab:
-            # Nutrition information
-            with st.expander("Nutrition Information"):
+            
+            # Additional details in expander
+            with st.expander("✨ Additional Details"):
+                # Nutrition information
+                st.subheader("Nutrition Information")
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Calories", st.session_state.current_recipe.nutrition["calories"])
                 col2.metric("Protein", st.session_state.current_recipe.nutrition["protein"])
                 col3.metric("Carbs", st.session_state.current_recipe.nutrition["carbs"])
                 col4.metric("Fat", st.session_state.current_recipe.nutrition["fat"])
+                
+                st.write(f"**Flavor Profile:** {st.session_state.current_recipe.flavor_profile}")
+                st.write(f"**Garnishing Tips:** {st.session_state.current_recipe.garnish_tips}")
+                st.write(f"**Pairing Suggestions:** {st.session_state.current_recipe.pairing_suggestions}")
+        
+        # Right column: Chat interface
+        with chat_col:
+            st.markdown("### 👩‍🍳 Cooking Assistant")
+            st.write("Ask any questions about the recipe!")
             
-            st.write(f"**Flavor Profile:** {st.session_state.current_recipe.flavor_profile}")
-            st.write(f"**Garnishing Tips:** {st.session_state.current_recipe.garnish_tips}")
-            st.write(f"**Pairing Suggestions:** {st.session_state.current_recipe.pairing_suggestions}")
-    
-    # Right column: Chat interface
-    with chat_col:
-        st.markdown("### 👩‍🍳 Cooking Assistant")
-        st.write("Ask any questions about the recipe!")
-        
-        # Initialize chat history if not exists
-        if 'chat_history' not in st.session_state:
-            st.session_state.chat_history = []
-        
-        # Create a container for chat messages
-        chat_container = st.container()
-        
-        # Chat input at the bottom
-        user_question = st.chat_input("Ask your cooking question here...")
-        
-        # Handle user input
-        if user_question:
-            # Add user message to history
-            st.session_state.chat_history.append({"role": "user", "content": user_question})
+            # Display existing messages
+            messages_container = st.container()
             
-            # Get assistant response
-            response = get_cooking_assistance(
-                user_question,
-                st.session_state.current_recipe,
-                cuisine_type,
-                cooking_time,
-                difficulty
-            )
+            with messages_container:
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.write(message["content"])
             
-            # Add assistant response to history
-            st.session_state.chat_history.append({"role": "assistant", "content": response})
-        
-        # Display chat history
-        with chat_container:
-            for message in st.session_state.chat_history:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
+            # Chat input
+            if prompt := st.chat_input("Ask your cooking question here..."):
+                # Add user message
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                
+                # Get AI response
+                response = get_cooking_assistance(
+                    prompt,
+                    st.session_state.current_recipe,
+                    st.session_state.cuisine_type,
+                    st.session_state.cooking_time,
+                    st.session_state.difficulty
+                )
+                
+                # Add assistant response
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                
+                # Force rerun to update chat display
+                st.rerun()
 
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
@@ -261,16 +265,19 @@ def create_recipe_app():
                     difficulty_pref
                 )
                 
-                # Move clear chat button to a more accessible location
-                cols = st.sidebar.columns(2)
-                with cols[0]:
+                # Add clear chat and new recipe buttons to sidebar
+                col1, col2 = st.sidebar.columns(2)
+                with col1:
                     if st.button("Clear Chat"):
-                        st.session_state.chat_history = []
-                        st.experimental_rerun()
-                with cols[1]:
+                        if 'messages' in st.session_state:
+                            st.session_state.messages = []
+                        st.rerun()
+                with col2:
                     if st.button("New Recipe"):
-                        st.session_state.clear()
-                        st.experimental_rerun()
+                        for key in ['current_recipe', 'messages', 'chat_history', 'cuisine_type', 'cooking_time', 'difficulty']:
+                            if key in st.session_state:
+                                del st.session_state[key]
+                        st.rerun()
 
 # ... rest of the existing display_recipe function and main block remains the same ...
 
