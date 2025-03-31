@@ -72,6 +72,77 @@ def get_recipe_from_ai(cuisine_type, available_ingredients, cooking_time, diffic
         st.error(f"Error generating recipe: {str(e)}")
         return None
 
+def get_cooking_assistance(query, recipe: Recipe, cuisine_type, cooking_time, difficulty):
+    system_content = f"""You are an expert Indian chef assistant helping with cooking queries. 
+    You have access to this recipe:
+    Title: {recipe.title}
+    Ingredients: {', '.join(recipe.ingredients)}
+    Cooking Time: {cooking_time} minutes
+    Difficulty: {difficulty}
+    
+    Provide clear, specific answers about cooking techniques, ingredient substitutions, 
+    timing adjustments, or any other cooking-related questions for this recipe.
+    Keep responses concise and practical."""
+
+    try:
+        chat_response = client.chat.completions.create(
+            model="meta-llama/llama-3.1-8b-instruct",
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": query},
+            ],
+            stream=False,
+            max_tokens=500,
+            temperature=0.7,
+            top_p=0.9
+        )
+        return chat_response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Sorry, I couldn't process your question: {str(e)}"
+
+def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficulty):
+    # Display recipe (existing display_recipe function)
+    display_recipe(recipe)
+    
+    # Add chat interface
+    st.markdown("---")
+    st.subheader("👩‍🍳 Cooking Assistant")
+    st.write("Ask any questions about the recipe, cooking process, or ingredient substitutions!")
+    
+    # Initialize chat history in session state if it doesn't exist
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+
+    # Display chat history
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+
+    # Chat input
+    user_question = st.chat_input("Ask your cooking question here...")
+    
+    if user_question:
+        # Display user message
+        with st.chat_message("user"):
+            st.write(user_question)
+        
+        # Add user message to chat history
+        st.session_state.chat_history.append({"role": "user", "content": user_question})
+        
+        # Get and display assistant response
+        with st.chat_message("assistant"):
+            response = get_cooking_assistance(
+                user_question, 
+                recipe, 
+                cuisine_type, 
+                cooking_time, 
+                difficulty
+            )
+            st.write(response)
+        
+        # Add assistant response to chat history
+        st.session_state.chat_history.append({"role": "assistant", "content": response})
+
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
     
@@ -140,7 +211,18 @@ def create_recipe_app():
                 difficulty_pref
             )
             if recipe:
-                display_recipe(recipe)
+                # Update to use new display function that includes chat
+                display_recipe_and_chat(
+                    recipe,
+                    cuisine_type,
+                    cooking_time_pref,
+                    difficulty_pref
+                )
+                
+                # Add clear chat history button in sidebar
+                if st.sidebar.button("Clear Chat History"):
+                    st.session_state.chat_history = []
+                    st.experimental_rerun()
 
 # ... rest of the existing display_recipe function and main block remains the same ...
 
