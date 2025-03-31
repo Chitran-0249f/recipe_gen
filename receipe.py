@@ -147,44 +147,76 @@ def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficul
     # Chat section at the bottom
     st.markdown("### 👩‍🍳 Cooking Assistant")
     
-    # Create three columns for chat layout
-    chat_col1, chat_col2, chat_col3 = st.columns([3, 1, 1])
-    
-    # Chat input and buttons in the first row
-    with chat_col1:
-        user_question = st.text_input("Ask your cooking question here...", key="chat_input")
-    with chat_col2:
-        send_button = st.button("Send")
-    with chat_col3:
-        clear_button = st.button("Clear Chat")
-
-    # Chat history container
-    chat_container = st.container()
-    
-    # Handle clear chat
-    if clear_button:
+    # Initialize message state if not exists
+    if 'messages' not in st.session_state:
         st.session_state.messages = []
+    
+    # Fixed chat history display area with scrolling
+    chat_history = st.container()
+    with chat_history:
+        # Add some spacing for better layout
+        st.markdown("<div style='height: 300px; overflow-y: auto;'>", unsafe_allow_html=True)
+        for message in st.session_state.messages:
+            if message["role"] == "user":
+                st.markdown("""
+                    <div style='background-color: #e6f3ff; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+                        <b>You:</b> {}</div>
+                    """.format(message["content"]), unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                    <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin: 5px 0;'>
+                        <b>👩‍🍳 Chef:</b> {}</div>
+                    """.format(message["content"]), unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Chat input area fixed at bottom
+    st.markdown("<div style='position: fixed; bottom: 0; width: 100%; background-color: white; padding: 20px;'>", unsafe_allow_html=True)
+    
+    # Chat input and buttons in one row
+    cols = st.columns([3, 1])
+    with cols[0]:
+        # Use a callback for handling input
+        if 'user_input' not in st.session_state:
+            st.session_state.user_input = ''
         
-    # Handle new message
-    if send_button and user_question:
+        user_input = st.text_input(
+            "Ask your cooking question here...",
+            key="chat_input",
+            value=st.session_state.user_input,
+            on_change=lambda: setattr(st.session_state, 'user_input', '')
+        )
+
+    with cols[1]:
+        col1, col2 = st.columns(2)
+        with col1:
+            send = st.button("Send", key="send")
+        with col2:
+            clear = st.button("Clear", key="clear")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Handle send button click
+    if send and user_input:
+        # Get AI response
         response = get_cooking_assistance(
-            user_question,
+            user_input,
             recipe,
             cuisine_type,
             cooking_time,
             difficulty
         )
-        st.session_state.messages.append({"role": "user", "content": user_question})
+        
+        # Update message history
+        st.session_state.messages.append({"role": "user", "content": user_input})
         st.session_state.messages.append({"role": "assistant", "content": response})
+        
+        # Clear input
+        st.session_state.user_input = ''
 
-    # Display chat history in reverse order (newest messages at the bottom)
-    with chat_container:
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.markdown(f"**You:** {message['content']}")
-            else:
-                st.markdown(f"**👩‍🍳 Chef:** {message['content']}")
-            st.markdown("---")
+    # Handle clear button
+    if clear:
+        st.session_state.messages = []
+        st.session_state.user_input = ''
 
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
