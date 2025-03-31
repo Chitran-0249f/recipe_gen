@@ -146,73 +146,53 @@ def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficul
 
     # Chat section at the bottom
     st.markdown("### 👩‍🍳 Cooking Assistant")
-    
-    # Initialize message state if not exists
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
-    
-    # Fixed chat history display area with scrolling
-    chat_history = st.container()
-    with chat_history:
-        # Add some spacing for better layout
-        st.markdown("<div style='height: 300px; overflow-y: auto;'>", unsafe_allow_html=True)
-        for message in st.session_state.messages:
-            if message["role"] == "user":
-                st.markdown("""
-                    <div style='background-color: #e6f3ff; padding: 10px; border-radius: 5px; margin: 5px 0;'>
-                        <b>You:</b> {}</div>
-                    """.format(message["content"]), unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                    <div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin: 5px 0;'>
-                        <b>👩‍🍳 Chef:</b> {}</div>
-                    """.format(message["content"]), unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.write("Ask any questions about the recipe!")
 
-    # Chat input area fixed at bottom
-    st.markdown("<div style='position: fixed; bottom: 0; width: 100%; background-color: white; padding: 20px;'>", unsafe_allow_html=True)
-    
-    # Chat input and buttons in one row
-    cols = st.columns([3, 1])
-    with cols[0]:
-        # Use a callback for handling input
-        if 'user_input' not in st.session_state:
-            st.session_state.user_input = ''
-        
-        user_input = st.text_input(
-            "Ask your cooking question here...",
-            key="chat_input",
-            value=st.session_state.user_input,
-            on_change=lambda: setattr(st.session_state, 'user_input', '')
-        )
+    # Simple chat input
+    query = st.text_input("👤 You: ", placeholder="Ask about cooking steps, ingredients, or tips...")
 
-    with cols[1]:
-        col1, col2 = st.columns(2)
-        with col1:
-            send = st.button("Send", key="send")
-        
+    # Process response on button click
+    if st.button("⚡ Get Response"):
+        if query.strip():
+            # Get AI response
+            response = get_cooking_assistance(
+                query,
+                recipe,
+                cuisine_type,
+                cooking_time,
+                difficulty
+            )
 
-    st.markdown("</div>", unsafe_allow_html=True)
+            # Initialize chat history if not exists
+            if 'chat_history' not in st.session_state:
+                st.session_state.chat_history = []
 
-    # Handle send button click
-    if send and user_input:
-        # Get AI response
-        response = get_cooking_assistance(
-            user_input,
-            recipe,
-            cuisine_type,
-            cooking_time,
-            difficulty
-        )
-        
-        # Update message history
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        
-        # Clear input
-        st.session_state.user_input = ''
+            # Add to chat history
+            st.session_state.chat_history.append({
+                "question": query,
+                "response": response
+            })
 
-    
+            # Clear the input (needs to be handled in next rerun)
+            st.session_state.clear_input = True
+
+    # Display chat history
+    if 'chat_history' in st.session_state and st.session_state.chat_history:
+        st.subheader("📄 Conversation History")
+        for chat in st.session_state.chat_history:
+            st.write(f"👤 **You:** {chat['question']}")
+            st.write(f"👩‍🍳 **Chef:** {chat['response']}")
+            st.markdown("---")
+
+    # Add clear chat button
+    if st.button("🗑️ Clear Chat History"):
+        st.session_state.chat_history = []
+        st.experimental_rerun()
+
+    # Handle input clearing
+    if 'clear_input' in st.session_state and st.session_state.clear_input:
+        st.session_state.clear_input = False
+        query = ""
 
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
