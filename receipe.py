@@ -101,47 +101,90 @@ def get_cooking_assistance(query, recipe: Recipe, cuisine_type, cooking_time, di
         return f"Sorry, I couldn't process your question: {str(e)}"
 
 def display_recipe_and_chat(recipe: Recipe, cuisine_type, cooking_time, difficulty):
-    # Display recipe (existing display_recipe function)
-    display_recipe(recipe)
+    # Create two main sections using columns
+    recipe_col, chat_col = st.columns([2, 1])
     
-    # Add chat interface
-    st.markdown("---")
-    st.subheader("👩‍🍳 Cooking Assistant")
-    st.write("Ask any questions about the recipe, cooking process, or ingredient substitutions!")
+    # Left column: Fixed recipe display
+    with recipe_col:
+        # Recipe title
+        st.header(f"🍽️ {recipe.title}")
+        
+        # Quick info
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"⏱️ Cooking Time: {recipe.cooking_time}")
+        with col2:
+            st.write(f"📊 Difficulty: {recipe.difficulty}")
+        
+        # Create tabs for recipe details
+        recipe_tab, details_tab = st.tabs(["📝 Recipe", "✨ Additional Details"])
+        
+        with recipe_tab:
+            # Ingredients in an expander
+            with st.expander("Ingredients", expanded=True):
+                for ingredient in recipe.ingredients:
+                    st.write(f"• {ingredient}")
+            
+            # Instructions in an expander
+            with st.expander("Instructions", expanded=True):
+                for i, instruction in enumerate(recipe.instructions, 1):
+                    st.write(f"{i}. {instruction}")
+        
+        with details_tab:
+            # Nutrition information
+            with st.expander("Nutrition Information"):
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Calories", recipe.nutrition["calories"])
+                col2.metric("Protein", recipe.nutrition["protein"])
+                col3.metric("Carbs", recipe.nutrition["carbs"])
+                col4.metric("Fat", recipe.nutrition["fat"])
+            
+            st.write(f"**Flavor Profile:** {recipe.flavor_profile}")
+            st.write(f"**Garnishing Tips:** {recipe.garnish_tips}")
+            st.write(f"**Pairing Suggestions:** {recipe.pairing_suggestions}")
     
-    # Initialize chat history in session state if it doesn't exist
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
-
-    # Display chat history
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    # Chat input
-    user_question = st.chat_input("Ask your cooking question here...")
-    
-    if user_question:
-        # Display user message
-        with st.chat_message("user"):
-            st.write(user_question)
+    # Right column: Scrollable chat interface
+    with chat_col:
+        st.markdown("### 👩‍🍳 Cooking Assistant")
+        st.write("Ask any questions about the recipe!")
         
-        # Add user message to chat history
-        st.session_state.chat_history.append({"role": "user", "content": user_question})
+        # Create a container for chat history
+        chat_container = st.container()
         
-        # Get and display assistant response
-        with st.chat_message("assistant"):
-            response = get_cooking_assistance(
-                user_question, 
-                recipe, 
-                cuisine_type, 
-                cooking_time, 
-                difficulty
-            )
-            st.write(response)
+        # Initialize chat history in session state if it doesn't exist
+        if 'chat_history' not in st.session_state:
+            st.session_state.chat_history = []
         
-        # Add assistant response to chat history
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        # Display chat history in the container
+        with chat_container:
+            for message in st.session_state.chat_history:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+        
+        # Chat input at the bottom
+        user_question = st.chat_input("Ask your cooking question here...")
+        
+        if user_question:
+            # Display user message
+            with st.chat_message("user"):
+                st.markdown(user_question)
+            
+            # Add user message to chat history
+            st.session_state.chat_history.append({"role": "user", "content": user_question})
+            
+            # Get and display assistant response
+            with st.chat_message("assistant"):
+                response = get_cooking_assistance(
+                    user_question, 
+                    recipe, 
+                    cuisine_type, 
+                    cooking_time, 
+                    difficulty
+                )
+                st.markdown(response)
+            
+            # Add assistant response to chat history
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 def create_recipe_app():
     st.title("👩‍🍳 Indian Recipe Generator")
